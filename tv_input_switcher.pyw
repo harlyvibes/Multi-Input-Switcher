@@ -20,7 +20,12 @@ Requirements
   * Optional, for the tray / menu bar icon:  pip install pystray pillow
 
 Usage
-  python tv_input_switcher.py      (macOS: python3 tv_input_switcher.py)
+  Windows: double-click tv_input_switcher.pyw (runs with no console window),
+           or:  pythonw tv_input_switcher.pyw
+  macOS:   python3 tv_input_switcher.pyw
+
+  The app starts hidden in the tray / menu bar. Right-click the icon and
+  choose "Show window" to open it.
 
 How the tray works
   The tray icon runs in its own small helper process. macOS requires both
@@ -999,6 +1004,10 @@ def nudge_repaint(win, _tries=0):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
+        # Start in the tray, window hidden. Without a tray there'd be no way
+        # to reach the app, so the window stays visible in that case.
+        if HAVE_TRAY:
+            self.withdraw()
         self.title(APP_NAME)
         self.minsize(360, 200)
         self.resizable(True, False)
@@ -1076,7 +1085,8 @@ class App(tk.Tk):
         else:
             self.load_tvs()
 
-        self.after(50, lambda: nudge_repaint(self))
+        if not HAVE_TRAY:
+            self.after(50, lambda: nudge_repaint(self))
 
     # ---- tray communication
     def start_tray(self):
@@ -1417,6 +1427,10 @@ def hide_launching_terminal():
 
 if __name__ == "__main__":
     mp.freeze_support()
+    if sys.stderr is None:
+        # pythonw has no console: keep tracebacks somewhere instead of losing them.
+        sys.stdout = sys.stderr = open(Path.home() / ".tv_input_switcher.log", "a",
+                                       encoding="utf-8", buffering=1)
     warn_if_apple_system_python()
     hide_launching_terminal()
     App().mainloop()

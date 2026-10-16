@@ -12,7 +12,8 @@ Works on Windows, macOS and Linux, using only the Python standard library (plus 
 
 ```sh
 pip install -r requirements.txt   # optional: tray / menu bar icon
-python tv_input_switcher.py       # macOS: python3 tv_input_switcher.py
+pythonw tv_input_switcher.pyw     # Windows: or just double-click the file (no console window)
+python3 tv_input_switcher.pyw     # macOS
 ```
 
 ## Signing in
@@ -46,6 +47,8 @@ The sign-in lasts as long as the app is used at least once every 30 days. While 
 If you'd rather not paste the code, register the redirect URI as `http://localhost:53682/callback` instead and enter the same address in the app. The app then catches the sign-in itself. Some SmartThings accounts only accept https redirect URIs; if yours rejects it, use the httpbin one.
 
 ## Using it
+
+The app starts hidden in the tray (it only opens a window by itself on first run, to sign in, or if the tray icon isn't available). Right-click the tray icon and choose **Show window** to open it. Errors from the windowless process are written to `~/.tv_input_switcher.log`.
 
 The app lists every device on your SmartThings account that supports input switching. Pick your TV, then click an input; the active one is marked with ●. Right-click the tray icon (or click the menu bar icon on macOS) for the same controls, plus the TV list itself, right at the top of the menu. Closing the window hides it to the tray; choose **Quit** from the icon's menu to exit. Your selected TV and sign-in are saved in `~/.tv_input_switcher.json`. That file contains your tokens, so keep it private.
 
