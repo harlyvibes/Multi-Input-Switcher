@@ -99,6 +99,7 @@ On Windows the app finds your monitors, reads which inputs each one has, and let
 ```
 
 - Detects every connected monitor and the inputs it reports, and marks the current one.
+- The main window has a **Monitors** section with the same controls: a row of input buttons per monitor (● marks the current one), **Power on** / **Power off**, **Power on all** / **Power off all** with two or more monitors, **Refresh**, and **Edit config…**. It follows changes made from the tray or the monitor's own buttons.
 - One click switches input. With a single monitor, its inputs are listed directly in the menu instead of in a submenu.
 - Turns monitors on and off, one at a time or all at once (see [Power on and off](#power-on-and-off)).
 - Picks up input and power changes made with the monitor's own buttons by polling every 30 seconds (configurable).

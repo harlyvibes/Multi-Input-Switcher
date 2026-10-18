@@ -2336,17 +2336,33 @@ class App(tk.Tk):
         self.inputs_frame = ttk.Frame(self)
         self.inputs_frame.pack(fill="x", **pad)
 
+        self.monitor_panel = None  # Windows: one row of controls per monitor
+        self._monitor_view = None  # the snapshot the panel was last built from
+        if IS_WIN:
+            ttk.Separator(self).pack(fill="x", padx=10, pady=(4, 0))
+            head = ttk.Frame(self)
+            head.pack(fill="x", padx=10, pady=(6, 0))
+            ttk.Label(head, text="Monitors",
+                      font=("TkDefaultFont", heading_size, "bold")).pack(side="left")
+            ttk.Button(head, text="Edit config…",
+                       command=lambda: self.mon and self.mon.open_config()).pack(side="right")
+            self.monitor_refresh_btn = ttk.Button(
+                head, text="Refresh", command=lambda: self.mon and self.mon.refresh())
+            self.monitor_refresh_btn.pack(side="right", padx=(0, 4))
+            self.monitor_panel = ttk.Frame(self)
+            self.monitor_panel.pack(fill="x", padx=10, pady=(0, 6))
+
         self.status_var = tk.StringVar(value="Starting…")
         ttk.Label(self, textvariable=self.status_var, foreground="#666",
                   wraplength=460, justify="left").pack(anchor="w", padx=10, pady=(0, 10))
 
         self.tray_proc = None
-        self.mon = None  # MonitorManager (Windows); monitors are driven from the tray menu
+        self.mon = None  # MonitorManager (Windows), driven from the window and the tray menu
         if HAVE_TRAY:
             self.start_tray()
-            if IS_WIN:
-                self.mon = MonitorManager(self._monitors_changed, self.notify)
-                self.mon.start()
+        if IS_WIN:
+            self.mon = MonitorManager(self._monitors_changed, self.notify)
+            self.mon.start()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         if IS_MAC:
             self.createcommand("tk::mac::Quit", self.quit_app)
@@ -2470,9 +2486,69 @@ class App(tk.Tk):
     def _monitors_changed(self):
         """Called from any thread when monitor state changes."""
         try:
-            self.after(0, self.update_tray)
+            self.after(0, self._monitors_updated)
         except (RuntimeError, tk.TclError):
             pass  # shutting down
+
+    def _monitors_updated(self):
+        self.update_monitor_panel()
+        self.update_tray()
+
+    def update_monitor_panel(self):
+        """Rebuild the window's monitor controls, if what they show has changed."""
+        if self.monitor_panel is None or self.mon is None:
+            return
+        snap = self.mon.snapshot()
+        if snap == self._monitor_view:
+            return
+        self._monitor_view = snap
+        for w in self.monitor_panel.winfo_children():
+            w.destroy()
+        gen, busy, monitors = snap["monitors_gen"], snap["monitors_busy"], snap["monitors"]
+        state = "disabled" if busy else "normal"
+        self.monitor_refresh_btn.config(state=state)
+
+        def note(text, color="#666"):
+            ttk.Label(self.monitor_panel, text=text, foreground=color).pack(anchor="w", pady=(4, 0))
+
+        if busy:
+            note("Detecting monitors…")
+        elif not monitors:
+            note("No monitors found")
+        for m in monitors:
+            if not m["supported"]:
+                note(f"{m['title']}  (no DDC/CI)", "#888")
+                continue
+            box = ttk.Frame(self.monitor_panel)
+            box.pack(fill="x", pady=(6, 0))
+            title = m["title"] + (f" — {m['status']}" if m["status"] else "")
+            ttk.Label(box, text=title).pack(anchor="w")
+            inputs = ttk.Frame(box)
+            inputs.pack(fill="x")
+            cols = 3
+            for i, (code, label) in enumerate(m["inputs"]):
+                ttk.Button(
+                    inputs, text=f"● {label}" if code == m["current"] else label, state=state,
+                    command=lambda n=m["index"], c=code: self.mon.switch(gen, n, c),
+                ).grid(row=i // cols, column=i % cols, sticky="ew", padx=3, pady=3)
+            for c in range(cols):
+                inputs.columnconfigure(c, weight=1)
+            if m["can_power"]:
+                power = ttk.Frame(box)
+                power.pack(fill="x")
+                for text, on, pad in (("Power on", True, (3, 2)), ("Power off", False, (2, 3))):
+                    ttk.Button(
+                        power, text=text, state=state,
+                        command=lambda n=m["index"], on=on: self.mon.power(gen, [n], on),
+                    ).pack(side="left", expand=True, fill="x", padx=pad, pady=(0, 3))
+        if sum(m["can_power"] for m in monitors) > 1:
+            both = ttk.Frame(self.monitor_panel)
+            both.pack(fill="x", pady=(6, 0))
+            for text, on, pad in (("Power on all", True, (3, 2)), ("Power off all", False, (2, 3))):
+                ttk.Button(
+                    both, text=text, state=state,
+                    command=lambda on=on: self.mon.power(gen, None, on),
+                ).pack(side="left", expand=True, fill="x", padx=pad)
 
     def notify(self, message):
         """Show a message from any thread: a tray notification, or the status line without a tray."""
