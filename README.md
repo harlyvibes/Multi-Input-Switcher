@@ -1,4 +1,4 @@
-# TV Input Switcher
+# Multi-Input-Switcher
 
 A small desktop app for switching inputs on a Samsung SmartThings TV (built for the Q90R / Q90T) using the [SmartThings REST API](https://developer.smartthings.com/docs/api/public), and, on Windows, the inputs and power of your computer monitors over DDC/CI. It opens a window with one button per TV input and adds an icon to the system tray (Windows/Linux) or menu bar (macOS), so you can pick a TV or monitor, switch inputs, or turn them on and off without opening the window.
 
@@ -13,8 +13,8 @@ Works on Windows, macOS and Linux, using only the Python standard library (plus 
 
 ```sh
 pip install -r requirements.txt   # optional: tray / menu bar icon
-pythonw tv_input_switcher.pyw     # Windows: or just double-click the file (no console window)
-python3 tv_input_switcher.pyw     # macOS
+pythonw multi_input_switcher.pyw     # Windows: or just double-click the file (no console window)
+python3 multi_input_switcher.pyw     # macOS
 ```
 
 ## Signing in
@@ -49,11 +49,13 @@ If you'd rather not paste the code, register the redirect URI as `http://localho
 
 ## Using it
 
-The app starts hidden in the tray (it only opens a window by itself on first run, to sign in, or if the tray icon isn't available). Right-click the tray icon and choose **Show window** to open it. Only one copy runs at a time on Windows; starting a second one just exits. The tray menu's **Open log** opens `~/.tv_input_switcher.log`, which collects errors from the windowless process and what the app is doing.
+The app starts hidden in the tray (it only opens a window by itself on first run, to sign in, or if the tray icon isn't available). Right-click the tray icon and choose **Show window** to open it. Only one copy runs at a time on Windows; starting a second one just exits. The tray menu's **Open log** opens `~/.multi_input_switcher.log`, which collects errors from the windowless process and what the app is doing.
+
+The app used to be called TV Input Switcher. On first start it moves its old settings, monitor config and Start with Windows entry to the new names, so nothing resets.
 
 Hovering over the tray icon shows the TV's current input and each monitor's current input (or "Off").
 
-The app lists every device on your SmartThings account that supports input switching. Pick your TV, then click an input; the active one is marked with ●. Right-click the tray icon (or click the menu bar icon on macOS) for the same controls, plus the TV list itself, right at the top of the menu. Closing the window hides it to the tray; choose **Quit** from the icon's menu to exit. Your selected TV and sign-in are saved in `~/.tv_input_switcher.json`. That file contains your tokens, so keep it private.
+The app lists every device on your SmartThings account that supports input switching. Pick your TV, then click an input; the active one is marked with ●. Right-click the tray icon (or click the menu bar icon on macOS) for the same controls, plus the TV list itself, right at the top of the menu. Closing the window hides it to the tray; choose **Quit** from the icon's menu to exit. Your selected TV and sign-in are saved in `~/.multi_input_switcher.json`. That file contains your tokens, so keep it private.
 
 The TV must be on to change inputs. For **Power On** to work, turn on **Power On with Mobile** (or IP Remote / Network Standby) in the TV's settings.
 
@@ -127,7 +129,7 @@ If "off" only dims the monitor or does nothing, set `power_off` for it in the co
 
 ### Monitor configuration
 
-Choose **Edit monitor config…** in the tray menu. The first time, this creates `%APPDATA%\TVInputSwitcher\monitors.json` pre-filled with your detected monitors and their inputs. The app reloads the file automatically when you save it. (If you used Monitor Changer before, its `%APPDATA%\MonitorChanger\config.json` is copied here the first time, so your labels carry over.)
+Choose **Edit monitor config…** in the tray menu. The first time, this creates `%APPDATA%\MultiInputSwitcher\monitors.json` pre-filled with your detected monitors and their inputs. The app reloads the file automatically when you save it. (If you used Monitor Changer before, its `%APPDATA%\MonitorChanger\config.json` is copied here the first time, so your labels carry over.)
 
 ```json
 {
@@ -171,7 +173,7 @@ Input codes use the MCCS standard. The table below lists them, and `--list` show
 ### Command line
 
 ```bash
-python tv_input_switcher.pyw --list
+python multi_input_switcher.pyw --list
 ```
 
 ```
@@ -188,8 +190,8 @@ python tv_input_switcher.pyw --list
 ```
 
 ```bash
-python tv_input_switcher.pyw --set 2 dp1
-python tv_input_switcher.pyw --power all off
+python multi_input_switcher.pyw --set 2 dp1
+python multi_input_switcher.pyw --power all off
 ```
 
 `MONITOR` is the monitor's number from `--list`, part of its name, or `all`. Use `python`, not `pythonw`, so the output is visible.
@@ -235,7 +237,7 @@ The tray icon runs in its own helper process, because macOS requires both Tkinte
 - **No TVs found:** make sure the TV appears in the SmartThings app on your phone under the same Samsung account.
 - **Inputs missing or out of date:** SmartThings may not update while the TV is off. Turn it on and click **Refresh**.
 - **Blank window on macOS, especially if it also won't resize:** you're almost certainly running macOS's built-in Python (`/usr/bin/python3`), which bundles Tk 8.5 — it predates Dark Mode and has serious, unfixable-from-inside-the-app display bugs on modern macOS. Check with `which python3`; if it prints `/usr/bin/python3`, install Python from [python.org/downloads/macos](https://www.python.org/downloads/macos/) and run the script with that `python3` instead. The app also prints a warning to the terminal on startup if it detects this.
-- **No tray icon / menu bar icon:** if `pystray`/`pillow` aren't installed for the Python you're running the app with, it offers to install them and restart. This is especially easy to hit right after switching to a different Python (e.g. moving off `/usr/bin/python3` per the item above) — packages installed for the old interpreter don't carry over. To do it by hand, run `pip install -r requirements.txt` using that *same* `python3`/`python`, then restart the app. If the packages are installed and the icon still doesn't show, check `~/.tv_input_switcher_tray_error.log` for a crash traceback from the tray's helper process.
+- **No tray icon / menu bar icon:** if `pystray`/`pillow` aren't installed for the Python you're running the app with, it offers to install them and restart. This is especially easy to hit right after switching to a different Python (e.g. moving off `/usr/bin/python3` per the item above) — packages installed for the old interpreter don't carry over. To do it by hand, run `pip install -r requirements.txt` using that *same* `python3`/`python`, then restart the app. If the packages are installed and the icon still doesn't show, check `~/.multi_input_switcher_tray_error.log` for a crash traceback from the tray's helper process.
 - **"(no DDC/CI)" next to a monitor:** turn on DDC/CI in the monitor's on-screen menu, then choose **Refresh monitors**. Some docks, KVM switches and adapters don't pass DDC/CI through, so try a direct cable. Laptop panels, virtual machines and remote desktop sessions don't support DDC/CI.
 - **The monitor stops responding after switching away:** some monitors only answer DDC/CI on the active input, so a PC that isn't being shown can't switch it back. Switch back from the device that is being shown, or use the monitor's buttons.
 - **Monitor power on doesn't work, or the monitor shows "(no DDC/CI)" while it's off:** the monitor stops listening for DDC/CI when it's off. Turn it on with its power button. DisplayPort monitors that disconnect when off also disappear from Windows, so the app can't reach them until they're back on.
@@ -250,4 +252,4 @@ Run the tests from the repository folder. They never touch a real monitor or the
 python -m unittest discover -s tests -v
 ```
 
-`tv_input_switcher.pyw` is a single file, split into sections: SmartThings (config, HTTP, auth, API), local network sync, monitors (MCCS parser, Windows API, DDC/CI, config, start with Windows, manager, command line), the tray process, the dialogs and main window, and the entry point. The Windows-only API code sits behind a platform check, so the file imports on macOS and Linux too.
+`multi_input_switcher.pyw` is a single file, split into sections: SmartThings (config, HTTP, auth, API), local network sync, monitors (MCCS parser, Windows API, DDC/CI, config, start with Windows, manager, command line), the tray process, the dialogs and main window, and the entry point. The Windows-only API code sits behind a platform check, so the file imports on macOS and Linux too.

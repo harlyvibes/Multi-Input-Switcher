@@ -1,4 +1,4 @@
-"""Tests for the monitor (DDC/CI) half of tv_input_switcher.pyw.
+"""Tests for the monitor (DDC/CI) half of multi_input_switcher.pyw.
 
 Nothing here talks to a real monitor, so these run on any platform:
     python -m unittest discover -s tests -v
@@ -13,10 +13,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-_PATH = Path(__file__).resolve().parent.parent / "tv_input_switcher.pyw"
-_LOADER = importlib.machinery.SourceFileLoader("tv_input_switcher", str(_PATH))
-tis = importlib.util.module_from_spec(importlib.util.spec_from_loader("tv_input_switcher", _LOADER))
-sys.modules["tv_input_switcher"] = tis
+_PATH = Path(__file__).resolve().parent.parent / "multi_input_switcher.pyw"
+_LOADER = importlib.machinery.SourceFileLoader("multi_input_switcher", str(_PATH))
+tis = importlib.util.module_from_spec(importlib.util.spec_from_loader("multi_input_switcher", _LOADER))
+sys.modules["multi_input_switcher"] = tis
 _LOADER.exec_module(tis)
 
 DELL = (
@@ -297,6 +297,31 @@ class MonitorManagerTest(unittest.TestCase):
         self.assertEqual(json.loads(tis.MONITOR_CONFIG_PATH.read_text(encoding="utf-8"))["poll_seconds"], 7)
 
 
+class MigrateOldNameTest(unittest.TestCase):
+    def test_settings_move_to_the_new_names_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home, appdata = Path(tmp) / "home", Path(tmp) / "appdata"
+            (appdata / "TVInputSwitcher").mkdir(parents=True)
+            home.mkdir()
+            (home / ".tv_input_switcher.json").write_text('{"device_id": "tv"}', encoding="utf-8")
+            (appdata / "TVInputSwitcher" / "monitors.json").write_text('{"poll_seconds": 9}', encoding="utf-8")
+            new_config, new_monitors = home / ".multi_input_switcher.json", appdata / "Multi" / "monitors.json"
+            with mock.patch.object(Path, "home", return_value=home), \
+                    mock.patch.dict("os.environ", {"APPDATA": str(appdata)}), \
+                    mock.patch.object(tis, "IS_WIN", False), \
+                    mock.patch.object(tis, "CONFIG_PATH", new_config), \
+                    mock.patch.object(tis, "MONITOR_CONFIG_PATH", new_monitors):
+                tis.migrate_old_name()
+                self.assertEqual(json.loads(new_config.read_text(encoding="utf-8")), {"device_id": "tv"})
+                self.assertEqual(json.loads(new_monitors.read_text(encoding="utf-8")), {"poll_seconds": 9})
+                self.assertFalse((home / ".tv_input_switcher.json").exists())
+                # A later run must not overwrite settings changed under the new name.
+                new_config.write_text('{"device_id": "changed"}', encoding="utf-8")
+                (home / ".tv_input_switcher.json").write_text('{"device_id": "stale"}', encoding="utf-8")
+                tis.migrate_old_name()
+                self.assertEqual(json.loads(new_config.read_text(encoding="utf-8")), {"device_id": "changed"})
+
+
 @unittest.skipUnless(tis.HAVE_TRAY, "pystray isn't installed")
 class TrayMenuTest(unittest.TestCase):
     """Runs the real tray process code against a fake icon, then reads its menu."""
@@ -389,8 +414,8 @@ class TrayMenuTest(unittest.TestCase):
         self.assertIn("Panel  (no DDC/CI)", menu)
 
     def test_tooltip_and_notification(self):
-        self.push(tooltip="TV Input Switcher\nDELL: HDMI 1", notify="Couldn't switch DELL")
-        self.assertEqual(self.icon.title, "TV Input Switcher\nDELL: HDMI 1")
+        self.push(tooltip="Multi-Input-Switcher\nDELL: HDMI 1", notify="Couldn't switch DELL")
+        self.assertEqual(self.icon.title, "Multi-Input-Switcher\nDELL: HDMI 1")
         self.assertEqual(self.icon.notes, ["Couldn't switch DELL"])
 
 

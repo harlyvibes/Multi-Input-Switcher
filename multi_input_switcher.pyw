@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-TV Input Switcher
------------------
+Multi-Input-Switcher
+--------------------
 A small Tkinter GUI + system tray / menu bar icon that changes the input on a
 Samsung SmartThings TV (e.g. Q90R / Q90T) using the SmartThings REST API
 (https://api.smartthings.com). On Windows it also switches the inputs and
@@ -22,17 +22,17 @@ Requirements
   * Monitors: Windows, with DDC/CI enabled in the monitor's own menu.
 
 Usage
-  Windows: double-click tv_input_switcher.pyw (runs with no console window),
-           or:  pythonw tv_input_switcher.pyw
-  macOS:   python3 tv_input_switcher.pyw
+  Windows: double-click multi_input_switcher.pyw (runs with no console window),
+           or:  pythonw multi_input_switcher.pyw
+  macOS:   python3 multi_input_switcher.pyw
 
   The app starts hidden in the tray / menu bar. Right-click the icon and
   choose "Show window" to open it.
 
   Command line (Windows monitors; run with python, not pythonw, to see output):
-    python tv_input_switcher.pyw --list                   list monitors, inputs, power
-    python tv_input_switcher.pyw --set MONITOR INPUT      e.g. --set 2 hdmi1
-    python tv_input_switcher.pyw --power MONITOR on|off   e.g. --power all off
+    python multi_input_switcher.pyw --list                   list monitors, inputs, power
+    python multi_input_switcher.pyw --set MONITOR INPUT      e.g. --set 2 hdmi1
+    python multi_input_switcher.pyw --power MONITOR on|off   e.g. --power all off
   MONITOR is a number from --list, part of a monitor's name, or "all".
 
 How the tray works
@@ -88,15 +88,15 @@ if IS_WIN:
 
 __version__ = "0.3.0"
 
-APP_NAME = "TV Input Switcher"
-CONFIG_PATH = Path.home() / ".tv_input_switcher.json"
-LOG_PATH = Path.home() / ".tv_input_switcher.log"
-APP_DIR = Path(os.environ.get("APPDATA") or Path.home()) / "TVInputSwitcher"
+APP_NAME = "Multi-Input-Switcher"
+CONFIG_PATH = Path.home() / ".multi_input_switcher.json"
+LOG_PATH = Path.home() / ".multi_input_switcher.log"
+APP_DIR = Path(os.environ.get("APPDATA") or Path.home()) / "MultiInputSwitcher"
 MONITOR_CONFIG_PATH = APP_DIR / "monitors.json"
 # Where Monitor Changer kept its config; copied over once if ours doesn't exist.
 LEGACY_MONITOR_CONFIG_PATH = Path(os.environ.get("APPDATA") or Path.home()) / "MonitorChanger" / "config.json"
 
-log = logging.getLogger("tv_input_switcher")
+log = logging.getLogger("multi_input_switcher")
 
 API = "https://api.smartthings.com/v1"
 OAUTH_AUTHORIZE = "https://api.smartthings.com/oauth/authorize"
@@ -349,7 +349,7 @@ def capture_code_locally(redirect_uri, state, timeout=180):
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             if q.get("state", [None])[0] == state and q.get("code"):
                 result["code"] = q["code"][0]
-                msg = "Signed in. You can close this tab and return to TV Input Switcher."
+                msg = "Signed in. You can close this tab and return to Multi-Input-Switcher."
             else:
                 msg = "Sign-in failed or was cancelled."
             self.send_response(200)
@@ -1000,7 +1000,7 @@ if IS_WIN:
     def already_running():
         """Single instance: the mutex lives until the process exits."""
         ctypes.set_last_error(0)
-        _CreateMutexW(None, False, "Local\\TVInputSwitcher")
+        _CreateMutexW(None, False, "Local\\MultiInputSwitcher")
         return ctypes.get_last_error() == ERROR_ALREADY_EXISTS
 
 else:
@@ -1132,7 +1132,7 @@ def close_all(monitors):
 
 
 # ---------------------------------------------------------------- monitors: config
-# %APPDATA%\TVInputSwitcher\monitors.json
+# %APPDATA%\MultiInputSwitcher\monitors.json
 
 MONITOR_CONFIG_DEFAULTS = {
     # How often to re-read each monitor's current input and power state so the
@@ -1250,7 +1250,7 @@ def write_template(monitors, path=None):
 # A per-user entry under HKCU\...\Run that starts the app with pythonw.
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-RUN_VALUE = "TVInputSwitcher"
+RUN_VALUE = "MultiInputSwitcher"
 
 
 def autostart_command():
@@ -1708,7 +1708,7 @@ def tray_process(state_q, cmd_q):
     except Exception:
         import traceback
         try:
-            with open(Path.home() / ".tv_input_switcher_tray_error.log", "a",
+            with open(Path.home() / ".multi_input_switcher_tray_error.log", "a",
                       encoding="utf-8") as f:
                 f.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
                 traceback.print_exc(file=f)
@@ -1847,7 +1847,7 @@ def _run_tray(state_q, cmd_q):
         yield pystray.MenuItem("Show window", send("show"))
         yield pystray.MenuItem("Quit", send("quit"))
 
-    icon = TrayIcon("tv_input_switcher", make_tray_image(), APP_NAME, pystray.Menu(root_items))
+    icon = TrayIcon("multi_input_switcher", make_tray_image(), APP_NAME, pystray.Menu(root_items))
     # Other threads may only rebuild the Windows menu through its message queue.
     refresh = getattr(icon, "refresh_menu", icon.update_menu)
 
@@ -2771,7 +2771,7 @@ def setup_logging():
 # ---------------------------------------------------------------- missing tray packages
 TRAY_PACKAGES = ["pystray", "Pillow"]
 TRAY_MODULES = {"pystray", "PIL", "six"}  # top-level modules those packages provide
-RETRY_ENV = "TV_INPUT_SWITCHER_AFTER_INSTALL"
+RETRY_ENV = "MULTI_INPUT_SWITCHER_AFTER_INSTALL"
 CREATE_NO_WINDOW = 0x08000000
 
 
@@ -2849,9 +2849,39 @@ def offer_tray_install(error):
 
 
 # ---------------------------------------------------------------- entry point
+def migrate_old_name():
+    """The app used to be called TV Input Switcher. Move its settings and its
+    Start with Windows entry to the new names, so nothing resets."""
+    appdata = Path(os.environ.get("APPDATA") or Path.home())
+    for old, new in (
+        (Path.home() / ".tv_input_switcher.json", CONFIG_PATH),
+        (appdata / "TVInputSwitcher" / "monitors.json", MONITOR_CONFIG_PATH),
+    ):
+        if old.exists() and not new.exists():
+            try:
+                new.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(old), str(new))
+                log.info("Moved %s to %s", old, new)
+            except OSError as exc:
+                log.warning("Could not move %s: %s", old, exc)
+    if IS_WIN:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0,
+                                winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE) as key:
+                winreg.QueryValueEx(key, "TVInputSwitcher")
+                winreg.DeleteValue(key, "TVInputSwitcher")
+            set_autostart(True)  # it pointed at the old file name
+            log.info("Updated the Start with Windows entry")
+        except FileNotFoundError:
+            pass  # wasn't enabled
+        except OSError as exc:
+            log.warning("Could not update the Start with Windows entry: %s", exc)
+
+
 def run_app():
     warn_if_apple_system_python()
     setup_logging()
+    migrate_old_name()
     if TRAY_IMPORT_ERROR is not None and offer_tray_install(TRAY_IMPORT_ERROR):
         return 0
     hide_launching_terminal()
@@ -2865,7 +2895,7 @@ def run_app():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="tv_input_switcher.pyw",
+        prog="multi_input_switcher.pyw",
         description="Switch TV and monitor inputs from the system tray. With no options, runs the app. "
                     "The options below control Windows monitors over DDC/CI; MONITOR is a number from "
                     "--list, part of a monitor's name, or 'all'.",
@@ -2884,6 +2914,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.list or args.set or args.power:
+        migrate_old_name()
         if not IS_WIN:
             print("error: monitor control is only available on Windows", file=sys.stderr)
             return 2
