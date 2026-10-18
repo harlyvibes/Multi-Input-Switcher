@@ -195,10 +195,15 @@ class SmartThingsAuth:
     """Hands out a valid bearer token, refreshing OAuth tokens as needed.
     `on_change` is called (from any thread) when tokens are updated."""
 
-    def __init__(self, auth_cfg, on_change):
+    def __init__(self, auth_cfg, on_change, follower=None, pull=None):
         self.cfg = auth_cfg
         self.on_change = on_change
         self.lock = threading.Lock()
+        # SmartThings gives out a new refresh token every time one is used, so
+        # only one computer may ever refresh. `follower()` says whether this
+        # one should instead ask the master for tokens with `pull()`.
+        self.follower = follower
+        self.pull = pull
 
     def _basic(self):
         pair = f"{self.cfg.get('client_id', '')}:{self.cfg.get('client_secret', '')}"
@@ -244,7 +249,26 @@ class SmartThingsAuth:
                 "Your SmartThings sign-in has expired (the app wasn't used "
                 "for about 30 days). Open Account… and sign in again."
             )
+        except APIError as e:
+            if "refresh token" in str(e).lower():
+                raise AuthError(
+                    "SmartThings no longer accepts this sign-in: its refresh token was "
+                    "already used (for example by another copy of the app) or has "
+                    "expired. Open Account… and sign in again."
+                )
+            raise
         self._store(tok)
+
+    def _pull(self):
+        """Take fresh tokens from the master instead of refreshing ourselves."""
+        tokens = self.pull() if self.pull else None
+        if not tokens or float(tokens.get("expires_at", 0)) <= time.time() + 60:
+            raise AuthError(
+                "This computer gets its SmartThings sign-in from the master, but "
+                "couldn't get a fresh one. Is the master running? (Network… → Check network)"
+            )
+        self.cfg.update(tokens)
+        self.on_change()
 
     def token(self, min_valid=300):
         if self.cfg.get("mode") == "pat":
@@ -256,7 +280,10 @@ class SmartThingsAuth:
             if not self.cfg.get("client_id"):
                 raise AuthError("OAuth isn't set up. Open Account… to set it up.")
             if time.time() + min_valid >= float(self.cfg.get("expires_at", 0)):
-                self._refresh()
+                if self.follower and self.follower():
+                    self._pull()
+                else:
+                    self._refresh()
             return self.cfg["access_token"]
 
     def keep_alive(self):
@@ -436,6 +463,10 @@ class TokenSyncServer:
                     # Only reply if we're the master: a non-master's tokens
                     # may be stale, and could overwrite a fresher sign-in.
                     if self.app.cfg.get("master_mode"):
+                        try:
+                            self.app.auth.token()  # refreshes first if it's about to expire
+                        except Exception:
+                            pass
                         reply = {"type": "tokens", "auth": dict(self.app.cfg["auth"])}
                         conn.sendall((json.dumps(reply) + "\n").encode())
                     return
@@ -492,7 +523,7 @@ def push_tokens_to_peers(cfg):
     threading.Thread(target=work, daemon=True).start()
 
 
-def request_push_from_peers(cfg, default_port, timeout=2):
+def request_push_from_peers(cfg, default_port, timeout=2, reply_timeout=10):
     """Ask every configured peer to push its sign-in back to us right now,
     for the Network window's "Request now" button. Only a peer with master
     mode on will actually reply. Returns {peer: auth_dict} for every peer
@@ -506,7 +537,7 @@ def request_push_from_peers(cfg, default_port, timeout=2):
         try:
             with socket.create_connection((host, port), timeout=timeout) as s:
                 s.sendall(b'{"type": "request_push"}\n')
-                s.settimeout(timeout)
+                s.settimeout(reply_timeout)  # a master may refresh its tokens before answering
                 data = b""
                 while not data.endswith(b"\n") and len(data) < 65536:
                     chunk = s.recv(4096)
@@ -2265,7 +2296,8 @@ class App(tk.Tk):
         self.resizable(True, False)
 
         self.cfg = load_config()
-        self.auth = SmartThingsAuth(self.cfg["auth"], self._on_auth_changed)
+        self.auth = SmartThingsAuth(self.cfg["auth"], self._on_auth_changed,
+                                    follower=self._is_follower, pull=self._pull_from_master)
         self.api = SmartThingsAPI(self.auth)
         self.tvs = []  # [(id, label)]
         self.state_info = None
@@ -2511,6 +2543,15 @@ class App(tk.Tk):
         save_config(self.cfg)
         if self.cfg.get("master_mode"):
             push_tokens_to_peers(self.cfg)
+
+    def _is_follower(self):
+        """True if another computer is the one that refreshes the sign-in."""
+        return not self.cfg.get("master_mode") and bool(self.cfg.get("peers"))
+
+    def _pull_from_master(self):
+        """Ask the peers for fresh tokens (from a worker thread); None if nobody sent any."""
+        got = request_push_from_peers(self.cfg, self.cfg.get("sync_port", DEFAULT_SYNC_PORT))
+        return max(got.values(), key=lambda a: float(a.get("expires_at", 0)), default=None)
 
     def apply_synced_auth(self, auth):
         """Called on the UI thread when a master pushes us fresh tokens."""

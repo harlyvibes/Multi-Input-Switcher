@@ -207,6 +207,8 @@ If you run this app on more than one computer on the same network (e.g. a deskto
 
 On every *other* computer, open **Network…** and add the master's IP address to the device list (no need to turn master mode on there — every instance is always listening for a push, whether or not it's the master).
 
+Only the master ever refreshes the sign-in. SmartThings hands out a new refresh token every time one is used, so if two computers each refreshed their own copy, the second would be told its token is invalid. Computers that have a device list but aren't the master never refresh: when their token is about to expire they ask the master for a fresh one instead (and show an error if it can't be reached). A computer with no device list refreshes for itself, as before.
+
 This sync is **plain, unencrypted JSON over TCP** on port `53934` — there's no login, no TLS, nothing standing between a message and being applied. That's a deliberate simplicity trade-off for a trusted home network; don't expose that port to the internet, and don't run master mode on a network you don't trust.
 
 **Network…** also has debugging tools: it shows whether this computer is actually listening for pushes, when it last received one and from whom, and three buttons —
@@ -234,6 +236,7 @@ The tray icon runs in its own helper process, because macOS requires both Tkinte
 ## Troubleshooting
 
 - **"SmartThings rejected the sign-in":** your personal access token has expired, or your OAuth sign-in lapsed. Open **Account…** and sign in again.
+- **"Invalid refresh token requested by clientId …" at startup, even though you were signed in:** SmartThings gives out a new refresh token every time one is used, and the old one stops working. It happens when something else used your saved token first: a second copy of the app signed in with the same token (the old and new copies during a rename, or two computers that each signed in or were set up separately), or the token went unused for 30 days. The app now explains this and offers to open **Account…**; sign in once on the computer that should own the sign-in. With several computers, make that one the **Master**, add its address on the others under **Network…**, and use **Push now** once so they all start from the same sign-in.
 - **No TVs found:** make sure the TV appears in the SmartThings app on your phone under the same Samsung account.
 - **Inputs missing or out of date:** SmartThings may not update while the TV is off. Turn it on and click **Refresh**.
 - **Blank window on macOS, especially if it also won't resize:** you're almost certainly running macOS's built-in Python (`/usr/bin/python3`), which bundles Tk 8.5 — it predates Dark Mode and has serious, unfixable-from-inside-the-app display bugs on modern macOS. Check with `which python3`; if it prints `/usr/bin/python3`, install Python from [python.org/downloads/macos](https://www.python.org/downloads/macos/) and run the script with that `python3` instead. The app also prints a warning to the terminal on startup if it detects this.
