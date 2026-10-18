@@ -1629,17 +1629,24 @@ def cli_set_power(monitor_text, state):
 
 # ---------------------------------------------------------------- tray process
 def make_tray_image(size=64):
-    """Draw a simple TV icon so no image file is needed."""
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+    """Draw the tray icon, a screen with switch arrows, so no image file is needed."""
     s = size / 64
-    d.rounded_rectangle([4 * s, 8 * s, 60 * s, 46 * s], radius=5 * s,
-                        fill=(30, 30, 30, 255), outline=(200, 200, 200, 255),
-                        width=max(1, int(3 * s)))
-    d.rectangle([10 * s, 14 * s, 54 * s, 40 * s], fill=(40, 120, 220, 255))
-    d.rectangle([28 * s, 46 * s, 36 * s, 53 * s], fill=(200, 200, 200, 255))
-    d.rectangle([18 * s, 53 * s, 46 * s, 58 * s], fill=(200, 200, 200, 255))
-    return img
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    stand = (148, 163, 184, 255)
+    white = (255, 255, 255, 255)
+    draw.rectangle([28 * s, 44 * s, 36 * s, 54 * s], fill=stand)
+    draw.rounded_rectangle([16 * s, 52 * s, 48 * s, 59 * s], radius=3 * s, fill=stand)
+    draw.rounded_rectangle(
+        [3 * s, 5 * s, 61 * s, 46 * s], radius=7 * s,
+        fill=(37, 99, 235, 255), outline=(191, 219, 254, 255), width=max(1, round(3 * s)),
+    )
+    arrow = max(1, round(5 * s))
+    draw.line([14 * s, 19 * s, 42 * s, 19 * s], fill=white, width=arrow)
+    draw.polygon([(40 * s, 11 * s), (51 * s, 19 * s), (40 * s, 27 * s)], fill=white)
+    draw.line([22 * s, 33 * s, 50 * s, 33 * s], fill=white, width=arrow)
+    draw.polygon([(24 * s, 25 * s), (13 * s, 33 * s), (24 * s, 41 * s)], fill=white)
+    return image
 
 
 def _menu_text(text):
